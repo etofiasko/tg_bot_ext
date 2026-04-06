@@ -12,7 +12,15 @@ from handlers import (
     start_new_year,
     start_new_category,
     start_new_subcategory,
-    start_new_confirmation,)
+    start_new_confirmation,
+    digit_settings_handler,
+    start_year_settings_handler,
+    months_settings_handler,
+    exclude_tnved_settings_handler,
+    table_size_settings_handler,
+    country_table_size_settings_handler,
+    text_size_settings_handler,
+    long_report_settings_handler)
 from aiogram.types import Message
 from states import StartNewStates
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
@@ -71,6 +79,40 @@ async def msg_start_new_subcategory(message: Message, state: FSMContext):
 @dp.callback_query_handler(state=StartNewStates.confirmation)
 async def cbq_start_new_confirmation(cbq: types.CallbackQuery, state: FSMContext):
     await start_new_confirmation(cbq, state)
+
+
+@dp.message_handler(state=StartNewStates.choosing_digit_settings)
+async def msg_digit_settings_handler(message: Message, state: FSMContext):
+    await digit_settings_handler(message, state)
+    
+@dp.message_handler(state=StartNewStates.choosing_start_year_settings)
+async def msg_start_year_settings_handler(message: Message, state: FSMContext):
+    await start_year_settings_handler(message, state)
+    
+@dp.message_handler(state=StartNewStates.choosing_months_settings)
+async def msg_months_settings_handler(message: Message, state: FSMContext):
+    await months_settings_handler(message, state)
+    
+@dp.message_handler(state=StartNewStates.choosing_exclude_tnved_settings)
+async def msg_exclude_tnved_settings_handler(message: Message, state: FSMContext):
+    await exclude_tnved_settings_handler(message, state)
+    
+@dp.message_handler(state=StartNewStates.choosing_table_size_settings)
+async def msg_table_size_settings_handler(message: Message, state: FSMContext):
+    await table_size_settings_handler(message, state)
+    
+@dp.message_handler(state=StartNewStates.choosing_country_table_size_settings)
+async def msg_country_table_size_settings_handler(message: Message, state: FSMContext):
+    await country_table_size_settings_handler(message, state)
+    
+@dp.message_handler(state=StartNewStates.choosing_text_size_settings)
+async def msg_text_size_settings_handler(message: Message, state: FSMContext):
+    await text_size_settings_handler(message, state)
+    
+@dp.message_handler(state=StartNewStates.choosing_long_report_settings)
+async def msg_long_report_settings_handler(message: Message, state: FSMContext):
+    await long_report_settings_handler(message, state)
+
 
 if __name__ == '__main__':
     executor.start_polling(dp, skip_updates=True)

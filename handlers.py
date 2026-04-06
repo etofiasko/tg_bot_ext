@@ -13,6 +13,7 @@ sys.path.insert(0, REPORT_MODULE_PATH)
 
 from document_gen.generator import generate_trade_document # type: ignore
 
+years_list = ['2020','2021','2022','2023','2024','2025', '2026']
 
 excluded_tnveds_string = (
     "8411,841111,841112,841121,841122,841181,841182,841191,841199,851711,851712,851713,851714,851718,851761,851762,851769,851770,51771,"
@@ -68,6 +69,7 @@ async def handle_access_data(message: types.Message, state: FSMContext):
             "Некорректный формат.\n"
             "Укажите <code>telegram_id</code> и роль через пробел.\n"
             "<b>advanced</b> – доступ к боту\n"
+            "<b>advanced_ext</b> – доступ к боту и расширенным настройкам\n"
             "<b>user</b> – нет доступа\n\n"
             "Пример: <code>123456789 advanced</code>",
             parse_mode='html'
@@ -88,11 +90,12 @@ async def handle_access_data(message: types.Message, state: FSMContext):
 
     telegram_id = int(tg_id_raw)
 
-    if new_role not in ['admin', 'advanced', 'user']:
+    if new_role not in ['admin', 'advanced', 'advanced_ext','user']:
         await message.reply(
             "Некорректная роль.\n"
             "Доступные роли:\n"
             "<b>advanced</b> – доступ к боту\n"
+            "<b>advanced_ext</b> – доступ к боту и расширенным настройкам\n"
             "<b>user</b> – нет доступа",
             parse_mode='html'
         )
@@ -130,7 +133,7 @@ async def start_new_handler(message: types.Message, state: FSMContext, user=None
     username = user.username or f"user_{telegram_id}"
     register_user(telegram_id, username.strip())
     role = get_user_role(telegram_id)
-    if role not in ['admin', 'advanced']:
+    if role not in ['admin', 'advanced', 'advanced_ext']:
         await message.reply("У вас нет прав для использования бота.")
         return
 
@@ -200,7 +203,7 @@ async def start_new_waiting_tnved(message: Message, state: FSMContext):
 
     await state.update_data(tn_ved=txt, digit=len(txt), partner='весь мир')
 
-    years = ['2020','2021','2022','2023','2024','2025']
+    years = years_list
     kb = ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
     kb.add(KeyboardButton("Начать заново"))
     for y in years:
@@ -221,7 +224,7 @@ async def start_new_partner(message: Message, state: FSMContext):
         return
     await state.update_data(partner=txt)
 
-    years = ['2020','2021','2022','2023','2024','2025']
+    years = years_list
     kb = ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
     kb.add(KeyboardButton("Начать заново"))
     for y in years:
@@ -236,7 +239,7 @@ async def start_new_year(message: Message, state: FSMContext):
         await start_new_handler(message, state)
         return
 
-    years = ['2020','2021','2022','2023','2024','2025']
+    years = years_list
     if txt not in years:
         await message.answer("Такого года нет. Пожалуйста, выберите из предложенного списка.")
         return
@@ -281,6 +284,7 @@ async def start_new_year(message: Message, state: FSMContext):
 
 
 async def start_new_category(message: Message, state: FSMContext):
+    role = get_user_role(message.from_user.id)
     txt = (message.text or "").strip()
     if txt.lower() == "начать заново":
         await start_new_handler(message, state)
@@ -293,6 +297,9 @@ async def start_new_category(message: Message, state: FSMContext):
             InlineKeyboardButton("Подтвердить", callback_data="sn_confirm"),
             InlineKeyboardButton("Отмена", callback_data="sn_restart"),
         )
+        if role in ['admin', 'advanced_ext']:
+            kb.add(
+                InlineKeyboardButton("Расширенные настройки", callback_data="advanced_settings"),)
         d = await state.get_data()
         await message.answer(
             f"Вы выбрали:\n"
@@ -326,6 +333,7 @@ async def start_new_category(message: Message, state: FSMContext):
 
 
 async def start_new_subcategory(message: Message, state: FSMContext):
+    role = get_user_role(message.from_user.id)
     txt = (message.text or "").strip()
     if txt.lower() == "начать заново":
         await start_new_handler(message, state)
@@ -344,6 +352,9 @@ async def start_new_subcategory(message: Message, state: FSMContext):
         InlineKeyboardButton("Подтвердить", callback_data="sn_confirm"),
         InlineKeyboardButton("Отмена", callback_data="sn_restart"),
     )
+    if role in ['admin', 'advanced_ext']:
+        kb.add(
+            InlineKeyboardButton("Расширенные настройки", callback_data="advanced_settings"),)
     d = await state.get_data()
     await message.answer(
         f"Вы выбрали:\n"
@@ -367,6 +378,278 @@ async def start_new_confirmation(cbq: CallbackQuery, state: FSMContext):
         return
     if cbq.data == "sn_confirm":
         await finalize_report_start_new(cbq, state, cbq.from_user)
+        return
+    if cbq.data == "advanced_settings":
+        data = await state.get_data()
+        keyboard = ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
+        keyboard.add(KeyboardButton("Начать заново"))
+        keyboard.add(KeyboardButton("Пропустить"))
+        keyboard.add(KeyboardButton("4 знака"))
+        keyboard.add(KeyboardButton("6 знаков"))
+        if data.get("subcategory") == '':
+            keyboard.add(KeyboardButton("10 знаков"))
+            await cbq.message.answer(
+                "Введите количество знаков 4, 6, 10 или пропустите данный шаг:",
+                reply_markup=keyboard
+            )
+        else:
+            await cbq.message.answer(
+                "Введите количество знаков 4, 6 или пропустите данный шаг:",
+                reply_markup=keyboard
+            )
+        await StartNewStates.choosing_digit_settings.set()
+
+
+async def digit_settings_handler(message: types.Message, state: FSMContext):
+    text = message.text.strip()
+    if message.text.lower().strip() == "начать заново":
+        await start_new_handler(message, state)
+        return
+    data = await state.get_data()
+    if message.text.strip() == "4 знака" or message.text.strip() == "Пропустить":
+            message.text = '4'
+    elif message.text.strip() == "6 знаков":
+            message.text = '6'
+    elif message.text.strip() == "10 знаков" and data.get("subcategory") == '':
+            message.text = '10'
+    else:
+        if not text.isdigit():
+            if data.get("subcategory") == '':
+                await message.answer("Пожалуйста, введите число 4, 6, 10 или пропустите данный шаг.")
+                return
+            else:
+                await message.answer("Пожалуйста, введите число 4, 6 или пропустите данный шаг.")
+                return
+
+        value = int(text)
+        if data.get("subcategory") == '':
+            if value != 4 and value != 6 and value != 10:
+                await message.answer("Число должно быть 4, 6 или 10. Попробуйте ещё раз.")
+                return
+        else:
+            if value != 4 and value != 6:
+                await message.answer("Число должно быть 4, 6. Попробуйте ещё раз.")
+                return
+
+    await state.update_data(digit=message.text.strip())
+    years = years_list
+    keyboard = ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
+    keyboard.add(KeyboardButton("Начать заново"))
+    keyboard.add(KeyboardButton("Пропустить"))
+    for y in years:
+        keyboard.add(KeyboardButton(str(y)))
+    await message.answer("Выберите начальный год или пропустите данный шаг:", reply_markup=keyboard)
+    await StartNewStates.choosing_start_year_settings.set()
+
+
+async def start_year_settings_handler(message: Message, state: FSMContext):
+    text = (message.text or "").strip()
+    if text.lower() == "начать заново":
+        await start_new_handler(message, state)
+        return
+    if message.text.strip() == "Пропустить":
+        text = None
+    else:
+        years = years_list
+        if text not in years:
+            await message.answer("Такого года нет. Пожалуйста, выберите из предложенного списка.")
+            return
+    await state.update_data(start_year=text)
+    keyboard = ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
+    keyboard.add(KeyboardButton("Начать заново"))
+    keyboard.add(KeyboardButton("Пропустить"))
+    await message.answer(
+        "Введите нужный месяц в формате X или диапазон месяцев в формате X, Y или пропустите данный шаг:",
+        reply_markup=keyboard
+    )
+    await StartNewStates.choosing_months_settings.set()
+
+
+async def months_settings_handler(message: types.Message, state: FSMContext):
+    text = message.text.strip()
+    if message.text.lower().strip() == "начать заново":
+        await start_new_handler(message, state)
+        return
+    
+    if message.text.strip() == "Пропустить":
+        text = ''
+    else:
+        if "," in text:
+            try:
+                start, end = map(int, text.split(","))
+                if not (1 <= start <= 12 and 1 <= end <= 12):
+                    await message.answer("Месяцы должны быть от 1 до 12.")
+                    return
+                if end < start:
+                    await message.answer("Конечный месяц не может быть меньше начального.")
+                    return
+                if start == end:
+                    await message.answer("Начальный и конечный месяц не должны быть одинаковыми.")
+                    return
+            except ValueError:
+                await message.answer("Неверный формат месяцев. Убедитесь, что вы ввели два числа через запятую.")
+                return
+        else:
+            if not text.isdigit():
+                await message.answer("Введите нужный месяц в формате X или диапазон месяцев в формате X, Y или пропустите данный шаг:")
+                return
+
+            month = int(text)
+            if not (1 <= month <= 12):
+                await message.answer("Месяц должен быть от 1 до 12.")
+                return
+
+    await state.update_data(months=text.strip().replace(" ", ""))
+    
+    keyboard = ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
+    keyboard.add(KeyboardButton("Начать заново"))
+    keyboard.add(KeyboardButton("Пропустить (cкрыть знаки ТН ВЭД по реэкспорту)"))
+    keyboard.add(KeyboardButton("Отображать все знаки ТН ВЭД"))
+    await message.answer(
+        "Введите ТН ВЭД, которые нужно исключить из справки в формате X или несколько ТН ВЭД в формате X, Y, Z или пропустите данный шаг:",
+        reply_markup=keyboard
+    )
+    await StartNewStates.choosing_exclude_tnved_settings.set() 
+
+
+async def exclude_tnved_settings_handler(message: types.Message, state: FSMContext):  
+    text = message.text.strip().rstrip(",").lstrip(",")
+    if message.text.lower().strip() == "начать заново":
+        await start_new_handler(message, state)
+        return
+    
+    if message.text.strip() == "Пропустить (cкрыть знаки ТН ВЭД по реэкспорту)":
+        text = excluded_tnveds_string
+    elif message.text.strip() == "Отображать все знаки ТН ВЭД":
+        text = ""
+    else:
+        if "," in text:
+            try:
+                check_tnved = text.replace(',', '').replace(' ', '')
+                if not check_tnved.isdigit():
+                    await message.answer("Неверный формат ТН ВЭД. Убедитесь, что вы ввели верные данные через запятую.")
+                    return
+            except ValueError:
+                await message.answer("Неверный формат ТН ВЭД. Убедитесь, что вы ввели верные данные через запятую.")
+                return
+        else:
+            if not text.isdigit():
+                await message.answer("Неверный формат ТН ВЭД. Убедитесь, что вы ввели верные данные.")
+                return
+    
+    await state.update_data(exclude_tnved=text.replace(" ", ""))
+    
+    keyboard = ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
+    keyboard.add(KeyboardButton("Начать заново"))
+    keyboard.add(KeyboardButton("Пропустить"))
+    await message.answer(
+        "Введите количество строк товаров в таблицах от 1 или пропустите данный шаг:",
+        reply_markup=keyboard
+    )
+    await StartNewStates.choosing_table_size_settings.set()
+
+
+async def table_size_settings_handler(message: types.Message, state: FSMContext):
+    text = message.text.strip()
+    if message.text.lower().strip() == "начать заново":
+        await start_new_handler(message, state)
+        return
+    
+    if message.text.strip() == "Пропустить":
+        text = '25'
+    else:
+        if not text.isdigit():
+            await message.answer("Пожалуйста, введите число от 1 или пропустите данный шаг.")
+            return
+
+        value = int(text)
+        if value < 1:                   #or value > 500:
+            await message.answer("Число должно быть в диапазоне от 1. Попробуйте ещё раз.")
+            return
+
+    await state.update_data(table_size=text)
+    keyboard = ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
+    keyboard.add(KeyboardButton("Начать заново"))
+    keyboard.add(KeyboardButton("Пропустить"))
+    await message.answer(
+        "Введите количество строк стран от 1 до 250 или пропустите данный шаг:",
+        reply_markup=keyboard
+    )
+
+    await StartNewStates.choosing_country_table_size_settings.set()
+
+async def country_table_size_settings_handler(message: types.Message, state: FSMContext):
+    text = message.text.strip()
+    if message.text.lower().strip() == "начать заново":
+        await start_new_handler(message, state)
+        return
+    
+    if message.text.strip() == "Пропустить":
+        text = '15'
+    else:
+        if not text.isdigit():
+            await message.answer("Пожалуйста, введите число от 1 до 250 или пропустите данный шаг.")
+            return
+
+        value = int(text)
+        if value < 1 or value > 250:
+            await message.answer("Число должно быть в диапазоне от 1 до 250. Попробуйте ещё раз.")
+            return
+
+    await state.update_data(country_table_size=text)
+    keyboard = ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
+    keyboard.add(KeyboardButton("Начать заново"))
+    keyboard.add(KeyboardButton("Пропустить"))
+    await message.answer(
+        "Введите количество текста товаров от 1 до 20 или пропустите данный шаг:",
+        reply_markup=keyboard
+    )
+    await StartNewStates.choosing_text_size_settings.set()
+
+async def text_size_settings_handler(message: types.Message, state: FSMContext):
+    text = message.text.strip()
+    if message.text.lower().strip() == "начать заново":
+        await start_new_handler(message, state)
+        return
+    
+    if message.text.strip() == "Пропустить":
+        text = '7'
+    else:
+        if not text.isdigit():
+            await message.answer("Пожалуйста, введите число от 1 до 20 или пропустите данный шаг.")
+            return
+
+        value = int(text)
+        if value < 1:                   #or value > 20:
+            await message.answer("Число должно быть в диапазоне от 1 до 20. Попробуйте ещё раз.")
+            return
+
+    await state.update_data(text_size=text)
+    keyboard = ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
+    keyboard.add(KeyboardButton("Начать заново"))
+    keyboard.add(KeyboardButton("Пропустить"))
+    await message.answer("Выберите число 1 для Long report или пропустите данный шаг:", reply_markup=keyboard)
+    await StartNewStates.choosing_long_report_settings.set()
+
+async def long_report_settings_handler(message: types.Message, state: FSMContext):
+    text = message.text.strip()
+    if message.text.lower().strip() == "начать заново":
+        await start_new_handler(message, state)
+        return
+    
+    if message.text.strip() == "Пропустить":
+        text = '0'
+    else:
+        if not text.isdigit():
+            await message.answer("Пожалуйста, введите число 1 для Long report или 0 для стандартной справки.")
+            return
+        
+        if int(text) != 1 and int(text) != 0:
+            await message.answer("Пожалуйста, введите число 1 для Long report или 0 для стандартной справки.")
+            return
+
+    await state.update_data(long_report=text)    
+    await finalize_report_start_new(message, state, message.from_user)
 
 
 async def finalize_report_start_new(msg_or_cbq, state, tg_user):
@@ -374,34 +657,41 @@ async def finalize_report_start_new(msg_or_cbq, state, tg_user):
     d = await state.get_data()
 
     partner = str(d.get('partner'))
+    start_year = int(d.get('start_year')) if d.get('start_year') else None
     year = int(d.get('year'))
+    month_range = str(d.get('months')) if d.get('months') else ''
     tn_ved = ((d.get("tn_ved")).strip() or None)
     subcategory = (d.get("subcategory") or None)
-    long_report=0
+    long_report = int(d.get('long_report')) if d.get('long_report') else 0
+    exclude_raw = d.get('exclude_tnved') if d.get('exclude_tnved') is not None else excluded_tnveds_string
+    digit = int(d.get('digit')) if d.get('digit') else 4
+    text_size = int(d.get('text_size')) if d.get('text_size') else 7
+    table_size = int(d.get('table_size')) if d.get('table_size') else 25
+    country_table_size = int(d.get('country_table_size')) if d.get('country_table_size') else 15
     if tn_ved:
         subcategory = None
-        long_report=1
+        long_report= 1
     plain=int(d.get("plain") or 0)
 
     if isinstance(msg_or_cbq, types.CallbackQuery):
         await msg_or_cbq.message.answer("❗Идет генерация справки. Пожалуйста, подождите.❗", reply_markup=ReplyKeyboardRemove())
     else:
         await msg_or_cbq.answer("❗Идет генерация справки. Пожалуйста, подождите.❗", reply_markup=ReplyKeyboardRemove())
-    print(f'\nChosen data: partner={partner}, year={year}, sub={subcategory}, tn_ved={tn_ved}, long={long_report}, plain={plain}\n')
+    print(f'\nChosen data: partner={partner}, start_year={start_year},end_year={year}, digit={digit},sub={subcategory}, text_size={text_size},table_size={table_size},country_table_size={country_table_size},tn_ved={tn_ved}, month_range_raw={month_range},long={long_report}, plain={plain}\n')
     try:
         res = generate_trade_document(
             region="Республика Казахстан",
             country_or_group=partner,
-            start_year=None,
+            start_year=start_year,
             end_year=year,
-            digit=4,
+            digit=digit,
             category=subcategory,
-            text_size=7,
-            table_size=25,
-            country_table_size=15,
+            text_size=text_size,
+            table_size=table_size,
+            country_table_size=country_table_size,
             tn_ved=tn_ved,
-            month_range_raw="",
-            exclude_raw=excluded_tnveds_string,
+            month_range_raw=month_range,
+            exclude_raw=exclude_raw,
             long_report=long_report,
             plain=plain,
             include_regions=0,
