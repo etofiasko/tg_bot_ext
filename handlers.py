@@ -51,6 +51,7 @@ async def access_settings_handler(message: types.Message):
     "Введите данные в формате:\n"
     "<code>telegram_id роль</code>\n\n"
     "<b>advanced</b> – доступ к боту\n"
+    "<b>advancedext</b> – доступ к боту и расширенным настройкам\n"
     "<b>user</b> – нет доступа\n\n"
     "Пример: <code>123456789 advanced</code>",
     parse_mode='html', reply_markup=kb
@@ -70,7 +71,7 @@ async def handle_access_data(message: types.Message, state: FSMContext):
             "Некорректный формат.\n"
             "Укажите <code>telegram_id</code> и роль через пробел.\n"
             "<b>advanced</b> – доступ к боту\n"
-            "<b>advanced_ext</b> – доступ к боту и расширенным настройкам\n"
+            "<b>advancedext</b> – доступ к боту и расширенным настройкам\n"
             "<b>user</b> – нет доступа\n\n"
             "Пример: <code>123456789 advanced</code>",
             parse_mode='html'
@@ -91,12 +92,12 @@ async def handle_access_data(message: types.Message, state: FSMContext):
 
     telegram_id = int(tg_id_raw)
 
-    if new_role not in ['admin', 'advanced', 'advanced_ext','user']:
+    if new_role not in ['admin', 'advanced', 'advancedext','user']:
         await message.reply(
             "Некорректная роль.\n"
             "Доступные роли:\n"
             "<b>advanced</b> – доступ к боту\n"
-            "<b>advanced_ext</b> – доступ к боту и расширенным настройкам\n"
+            "<b>advancedext</b> – доступ к боту и расширенным настройкам\n"
             "<b>user</b> – нет доступа",
             parse_mode='html'
         )
@@ -134,7 +135,7 @@ async def start_new_handler(message: types.Message, state: FSMContext, user=None
     username = user.username or f"user_{telegram_id}"
     register_user(telegram_id, username.strip())
     role = get_user_role(telegram_id)
-    if role not in ['admin', 'advanced', 'advanced_ext']:
+    if role not in ['admin', 'advanced', 'advancedext']:
         await message.reply("У вас нет прав для использования бота.")
         return
 
@@ -298,7 +299,7 @@ async def start_new_category(message: Message, state: FSMContext):
             InlineKeyboardButton("Подтвердить", callback_data="sn_confirm"),
             InlineKeyboardButton("Отмена", callback_data="sn_restart"),
         )
-        if role in ['admin', 'advanced_ext']:
+        if role in ['admin', 'advancedext']:
             kb.add(
                 InlineKeyboardButton("Расширенные настройки", callback_data="advanced_settings"),)
         d = await state.get_data()
@@ -353,7 +354,7 @@ async def start_new_subcategory(message: Message, state: FSMContext):
         InlineKeyboardButton("Подтвердить", callback_data="sn_confirm"),
         InlineKeyboardButton("Отмена", callback_data="sn_restart"),
     )
-    if role in ['admin', 'advanced_ext']:
+    if role in ['admin', 'advancedext']:
         kb.add(
             InlineKeyboardButton("Расширенные настройки", callback_data="advanced_settings"),)
     d = await state.get_data()
