@@ -126,7 +126,7 @@ def setup_users_tables():
             id SERIAL PRIMARY KEY,
             telegram_id BIGINT UNIQUE,
             username TEXT,
-            role TEXT CHECK (role IN ('admin', 'advanced', 'user')) NOT NULL DEFAULT 'user'
+            role TEXT CHECK (role IN ('admin', 'advanced', 'advancedext', 'user')) NOT NULL DEFAULT 'user'
         );
     """)
     conn.commit()
