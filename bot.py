@@ -25,11 +25,36 @@ from aiogram.types import Message
 from states import StartNewStates
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram.dispatcher import FSMContext
-from bot_db import setup_users_tables
-
+from bot_db import setup_users_tables, get_user_role
+import json
+from pathlib import Path
 
 setup_users_tables()
 
+BOT_MODE_FILE = Path(__file__).with_name("bot_mode.json")
+
+
+def read_bot_mode():
+    if not BOT_MODE_FILE.exists():
+        return {"maintenance": False}
+
+    try:
+        with open(BOT_MODE_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            if not isinstance(data, dict):
+                return {"maintenance": False}
+            return {"maintenance": bool(data.get("maintenance", False))}
+    except Exception:
+        return {"maintenance": False}
+
+
+def write_bot_mode(maintenance: bool):
+    with open(BOT_MODE_FILE, "w", encoding="utf-8") as f:
+        json.dump({"maintenance": maintenance}, f, ensure_ascii=False, indent=2)
+
+
+def is_maintenance_mode():
+    return read_bot_mode().get("maintenance", False)
 
 bot = Bot(token=API_TOKEN)
 dp = Dispatcher(bot, storage=MemoryStorage())
@@ -48,8 +73,38 @@ async def process_access_settings(message: types.Message, state: FSMContext):
 async def cmd_history(message: types.Message):
     await download_history_handler(message)
 
+@dp.message_handler(commands=['bot_off'], state='*')
+async def cmd_bot_off(message: Message, state: FSMContext):
+    role = get_user_role(message.from_user.id)
+
+    if role != 'admin':
+        await message.answer("У вас нет прав для этой команды.")
+        return
+
+    current_mode = is_maintenance_mode()
+    new_mode = not current_mode
+    write_bot_mode(new_mode)
+
+    await state.finish()
+
+    if new_mode:
+        await message.answer(
+            "Бот переведен в режим технических работ.\n"
+            "Теперь при /start пользователи будут видеть сообщение о недоступности."
+        )
+    else:
+        await message.answer(
+            "Режим технических работ отключен.\n"
+            "Бот снова работает как обычно."
+        )
+
 @dp.message_handler(commands=['start'], state='*')
 async def cmd_start_new(message: Message, state: FSMContext):
+    if is_maintenance_mode():
+        await state.finish()
+        await message.answer("Проводятся технические работы, бот временно недоступен.")
+        return
+
     await start_new_handler(message, state)
 
 @dp.callback_query_handler(state=StartNewStates.choosing_variant)

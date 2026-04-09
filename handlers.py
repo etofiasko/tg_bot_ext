@@ -408,7 +408,7 @@ async def digit_settings_handler(message: types.Message, state: FSMContext):
         await start_new_handler(message, state)
         return
     data = await state.get_data()
-    if message.text.strip() == "4 знака" or message.text.strip() == "Пропустить":
+    if message.text.strip() == "4 знака" or message.text.strip().lower() == "пропустить":
             message.text = '4'
     elif message.text.strip() == "6 знаков":
             message.text = '6'
@@ -449,7 +449,7 @@ async def start_year_settings_handler(message: Message, state: FSMContext):
     if text.lower() == "начать заново":
         await start_new_handler(message, state)
         return
-    if message.text.strip() == "Пропустить":
+    if message.text.strip().lower() == "пропустить":
         text = None
     else:
         years = years_list
@@ -473,7 +473,7 @@ async def months_settings_handler(message: types.Message, state: FSMContext):
         await start_new_handler(message, state)
         return
     
-    if message.text.strip() == "Пропустить":
+    if message.text.strip().lower() == "пропустить":
         text = ''
     else:
         if "," in text:
@@ -520,7 +520,7 @@ async def exclude_tnved_settings_handler(message: types.Message, state: FSMConte
         await start_new_handler(message, state)
         return
     
-    if message.text.strip() == "Пропустить (cкрыть знаки ТН ВЭД по реэкспорту)":
+    if message.text.strip().lower() == "пропустить (cкрыть знаки тн вэд по реэкспорту)" or message.text.strip().lower() == "пропустить":
         text = excluded_tnveds_string
     elif message.text.strip() == "Отображать все знаки ТН ВЭД":
         text = ""
@@ -557,7 +557,7 @@ async def table_size_settings_handler(message: types.Message, state: FSMContext)
         await start_new_handler(message, state)
         return
     
-    if message.text.strip() == "Пропустить":
+    if message.text.strip().lower() == "пропустить":
         text = '25'
     else:
         if not text.isdigit():
@@ -586,7 +586,7 @@ async def country_table_size_settings_handler(message: types.Message, state: FSM
         await start_new_handler(message, state)
         return
     
-    if message.text.strip() == "Пропустить":
+    if message.text.strip().lower() == "пропустить":
         text = '15'
     else:
         if not text.isdigit():
@@ -614,7 +614,7 @@ async def text_size_settings_handler(message: types.Message, state: FSMContext):
         await start_new_handler(message, state)
         return
     
-    if message.text.strip() == "Пропустить":
+    if message.text.strip().lower() == "пропустить":
         text = '7'
     else:
         if not text.isdigit():
@@ -630,7 +630,8 @@ async def text_size_settings_handler(message: types.Message, state: FSMContext):
     keyboard = ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
     keyboard.add(KeyboardButton("Начать заново"))
     keyboard.add(KeyboardButton("Пропустить"))
-    await message.answer("Выберите число 1 для Long report или пропустите данный шаг:", reply_markup=keyboard)
+    keyboard.add(KeyboardButton("Включить"))
+    await message.answer('Включить в статистику таблицы по странам, по годам и по месяцам или пропустить данный шаг?', reply_markup=keyboard)
     await StartNewStates.choosing_long_report_settings.set()
 
 async def long_report_settings_handler(message: types.Message, state: FSMContext):
@@ -639,16 +640,14 @@ async def long_report_settings_handler(message: types.Message, state: FSMContext
         await start_new_handler(message, state)
         return
     
-    if message.text.strip() == "Пропустить":
+    if message.text.strip().lower() == "пропустить":
         text = '0'
     else:
-        if not text.isdigit():
-            await message.answer("Пожалуйста, введите число 1 для Long report или 0 для стандартной справки.")
+        if text.lower().strip() != "включить":
+            await message.answer('Пожалуйста, выберите "Включить" для добавления в статистику таблиц по странам, года и мясяцам или пропустите данный шаг.')
             return
-        
-        if int(text) != 1 and int(text) != 0:
-            await message.answer("Пожалуйста, введите число 1 для Long report или 0 для стандартной справки.")
-            return
+        else:
+            text = '1'
 
     await state.update_data(long_report=text)    
     await finalize_report_start_new(message, state, message.from_user)
