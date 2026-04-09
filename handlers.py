@@ -1,6 +1,7 @@
 import sys
 import os
 import re
+import asyncio
 import pandas as pd
 from io import BytesIO
 from aiogram import types
@@ -679,7 +680,8 @@ async def finalize_report_start_new(msg_or_cbq, state, tg_user):
         await msg_or_cbq.answer("❗Идет генерация справки. Пожалуйста, подождите.❗", reply_markup=ReplyKeyboardRemove())
     print(f'\nChosen data: partner={partner}, start_year={start_year},end_year={year}, digit={digit},sub={subcategory}, text_size={text_size},table_size={table_size},country_table_size={country_table_size},tn_ved={tn_ved}, month_range_raw={month_range},long={long_report}, plain={plain}\n')
     try:
-        res = generate_trade_document(
+        res = await asyncio.to_thread(
+            generate_trade_document,
             region="Республика Казахстан",
             country_or_group=partner,
             start_year=start_year,
