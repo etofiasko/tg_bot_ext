@@ -1,5 +1,3 @@
-import sys
-import os
 import re
 import asyncio
 import pandas as pd
@@ -9,15 +7,18 @@ from aiogram.dispatcher import FSMContext
 from aiogram.types import Message, ReplyKeyboardRemove, CallbackQuery, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 from states import StartNewStates
 from bot_db import tnved_exists, get_partners, register_user, add_download_history, get_categories, get_subcategories, get_user_role, change_user_role, get_download_history, get_users_for_export
-from config import REPORT_MODULE_PATH
-sys.path.insert(0, REPORT_MODULE_PATH)
-
-from document_gen.generator import generate_trade_document # type: ignore
+from report_api_client import generate_report
 
 years_list = ['2020','2021','2022','2023','2024','2025', '2026']
 
+
+def _match_option(text, options):
+    normalized = text.strip().casefold()
+    return next((option for option in options if option.casefold() == normalized), None)
+
+
 excluded_tnveds_string = (
-    "8411,841111,841112,841121,841122,841181,841182,841191,841199,851711,851712,851713,851714,851718,851761,851762,851769,851770,51771,"
+    "8411,841111,841112,841121,841122,841181,841182,841191,841199,851711,851712,851713,851714,851718,851761,851762,851769,851770,851771,"
     "851779,880211,880212,880220,880230,880240,880260,8411128009,8517610001,8517610002,8411910008,8411123006,8802300002,8802400011,8517,"
     "8411121009,8411123008,8411826001,8411222008,8411110009,8802110002,8411810008,8517693100,8802120001,8411210001,8802200001,8802400036,"
     "8411990019,8411810001,8411822008,8411910002,8802120009,8802300007,8411210009,8411228001,8411123009,8411990011,8802400018,8411910001,"
@@ -221,7 +222,8 @@ async def start_new_partner(message: Message, state: FSMContext):
         return
 
     partners = get_partners()
-    if txt not in partners:
+    txt = _match_option(txt, partners)
+    if txt is None:
         await message.answer("Такого партнёра нет. Пожалуйста, выберите из предложенного списка.")
         return
     await state.update_data(partner=txt)
@@ -292,7 +294,7 @@ async def start_new_category(message: Message, state: FSMContext):
         await start_new_handler(message, state)
         return
 
-    if txt.startswith("Без категории"):
+    if txt == "---" or txt.casefold().startswith("без категории"):
         await state.update_data(subcategory="")
         kb = InlineKeyboardMarkup()
         kb.add(
@@ -316,7 +318,8 @@ async def start_new_category(message: Message, state: FSMContext):
         return
 
     categories = get_categories()
-    if txt not in categories:
+    txt = _match_option(txt, categories)
+    if txt is None:
         await message.answer("Такой категории нет. Пожалуйста, выберите из предложенного списка.")
         return
 
@@ -343,7 +346,8 @@ async def start_new_subcategory(message: Message, state: FSMContext):
 
     d = await state.get_data()
     subcats = get_subcategories(d.get("category_parent"))
-    if txt not in subcats:
+    txt = _match_option(txt, subcats)
+    if txt is None:
         await message.answer("Такой подкатегории нет. Пожалуйста, выберите из предложенного списка.")
         return
 
@@ -408,11 +412,11 @@ async def digit_settings_handler(message: types.Message, state: FSMContext):
         await start_new_handler(message, state)
         return
     data = await state.get_data()
-    if message.text.strip() == "4 знака" or message.text.strip().lower() == "пропустить":
+    if message.text.strip().casefold() == "4 знака" or message.text.strip().lower() == "пропустить":
             message.text = '4'
-    elif message.text.strip() == "6 знаков":
+    elif message.text.strip().casefold() == "6 знаков":
             message.text = '6'
-    elif message.text.strip() == "10 знаков" and data.get("subcategory") == '':
+    elif message.text.strip().casefold() == "10 знаков" and data.get("subcategory") == '':
             message.text = '10'
     else:
         if not text.isdigit():
@@ -522,7 +526,7 @@ async def exclude_tnved_settings_handler(message: types.Message, state: FSMConte
     
     if message.text.strip().lower() == "пропустить (cкрыть знаки тн вэд по реэкспорту)" or message.text.strip().lower() == "пропустить":
         text = excluded_tnveds_string
-    elif message.text.strip() == "Отображать все знаки ТН ВЭД":
+    elif message.text.strip().casefold() == "отображать все знаки тн вэд":
         text = ""
     else:
         if "," in text:
@@ -545,7 +549,7 @@ async def exclude_tnved_settings_handler(message: types.Message, state: FSMConte
     keyboard.add(KeyboardButton("Начать заново"))
     keyboard.add(KeyboardButton("Пропустить"))
     await message.answer(
-        "Введите количество строк товаров в таблицах от 1 или пропустите данный шаг:",
+        "Введите количество строк товаров в таблицах от 1 до 500 или пропустите данный шаг:",
         reply_markup=keyboard
     )
     await StartNewStates.choosing_table_size_settings.set()
@@ -561,12 +565,12 @@ async def table_size_settings_handler(message: types.Message, state: FSMContext)
         text = '25'
     else:
         if not text.isdigit():
-            await message.answer("Пожалуйста, введите число от 1 или пропустите данный шаг.")
+            await message.answer("Пожалуйста, введите число от 1 до 500 или пропустите данный шаг.")
             return
 
         value = int(text)
-        if value < 1:                   #or value > 500:
-            await message.answer("Число должно быть в диапазоне от 1. Попробуйте ещё раз.")
+        if value < 1 or value > 500:
+            await message.answer("Число должно быть в диапазоне от 1 до 500. Попробуйте ещё раз.")
             return
 
     await state.update_data(table_size=text)
@@ -574,7 +578,7 @@ async def table_size_settings_handler(message: types.Message, state: FSMContext)
     keyboard.add(KeyboardButton("Начать заново"))
     keyboard.add(KeyboardButton("Пропустить"))
     await message.answer(
-        "Введите количество строк стран от 1 до 250 или пропустите данный шаг:",
+        "Введите количество строк стран от 1 до 200 или пропустите данный шаг:",
         reply_markup=keyboard
     )
 
@@ -590,12 +594,12 @@ async def country_table_size_settings_handler(message: types.Message, state: FSM
         text = '15'
     else:
         if not text.isdigit():
-            await message.answer("Пожалуйста, введите число от 1 до 250 или пропустите данный шаг.")
+            await message.answer("Пожалуйста, введите число от 1 до 200 или пропустите данный шаг.")
             return
 
         value = int(text)
-        if value < 1 or value > 250:
-            await message.answer("Число должно быть в диапазоне от 1 до 250. Попробуйте ещё раз.")
+        if value < 1 or value > 200:
+            await message.answer("Число должно быть в диапазоне от 1 до 200. Попробуйте ещё раз.")
             return
 
     await state.update_data(country_table_size=text)
@@ -603,7 +607,7 @@ async def country_table_size_settings_handler(message: types.Message, state: FSM
     keyboard.add(KeyboardButton("Начать заново"))
     keyboard.add(KeyboardButton("Пропустить"))
     await message.answer(
-        "Введите количество текста товаров от 1 до 20 или пропустите данный шаг:",
+        "Введите количество текста товаров от 1 до 100 или пропустите данный шаг:",
         reply_markup=keyboard
     )
     await StartNewStates.choosing_text_size_settings.set()
@@ -618,12 +622,12 @@ async def text_size_settings_handler(message: types.Message, state: FSMContext):
         text = '7'
     else:
         if not text.isdigit():
-            await message.answer("Пожалуйста, введите число от 1 до 20 или пропустите данный шаг.")
+            await message.answer("Пожалуйста, введите число от 1 до 100 или пропустите данный шаг.")
             return
 
         value = int(text)
-        if value < 1:                   #or value > 20:
-            await message.answer("Число должно быть в диапазоне от 1 до 20. Попробуйте ещё раз.")
+        if value < 1 or value > 100:
+            await message.answer("Число должно быть в диапазоне от 1 до 100. Попробуйте ещё раз.")
             return
 
     await state.update_data(text_size=text)
@@ -681,13 +685,14 @@ async def finalize_report_start_new(msg_or_cbq, state, tg_user):
     print(f'\nChosen data: partner={partner}, start_year={start_year},end_year={year}, digit={digit},sub={subcategory}, text_size={text_size},table_size={table_size},country_table_size={country_table_size},tn_ved={tn_ved}, month_range_raw={month_range},long={long_report}, plain={plain}\n')
     try:
         res = await asyncio.to_thread(
-            generate_trade_document,
+            generate_report,
             region="Республика Казахстан",
             country_or_group=partner,
             start_year=start_year,
             end_year=year,
             digit=digit,
             category=subcategory,
+            category_parent=d.get("category_parent"),
             text_size=text_size,
             table_size=table_size,
             country_table_size=country_table_size,
@@ -715,10 +720,9 @@ async def finalize_report_start_new(msg_or_cbq, state, tg_user):
         return
 
     if res["status"] != 'no_data':
-        doc = res["doc"]
         filename = res["filename"]
         short_filename = res["short_filename"]
-        buf = BytesIO(); doc.save(buf); buf.seek(0)
+        buf = BytesIO(res["content"])
         if isinstance(msg_or_cbq, types.CallbackQuery):
             await msg_or_cbq.message.answer_document((short_filename, buf))
             await msg_or_cbq.message.answer(f"Ваш документ {filename} готов. Чтобы начать заново, нажмите /start")

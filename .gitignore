@@ -1,3 +1,6 @@
 __pycache__/
 config.py
 autorestart
+.vscode
+report_api.md
+tests
