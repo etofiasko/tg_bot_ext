@@ -73,7 +73,7 @@ def generate_report(*, region, country_or_group, start_year, end_year, digit,
     else:
         raise ReportAPIError("Выбранного партнёра нет в списке API.")
 
-    payload = {"region": region, "end_year": end_year}
+    payload = {"region": region, "end_year": end_year, "filename_style": "short"}
     if plain:
         payload.update(
             report_kind="plane",

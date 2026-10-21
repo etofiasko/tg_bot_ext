@@ -4,3 +4,4 @@ autorestart
 .vscode
 report_api.md
 tests
+API_SHORT_FILENAME.md
