@@ -127,16 +127,16 @@ class HandlerRegressionTests(unittest.IsolatedAsyncioTestCase):
             (handlers.table_size_settings_handler, '500'),
             (handlers.country_table_size_settings_handler, '200'),
             (handlers.text_size_settings_handler, '100'),
-            (handlers.long_report_settings_handler, 'ВКЛЮЧИТЬ'),
         ):
             await self.enter(handler, text)
         payload = self.request.call_args.args[1]
         for key, value in dict(report_kind='group', group='весь мир', category_root=[3],
                                category=['Зерно'], digit=6, start_year=2023,
                                month_from=2, month_to=6, exclude_tn_veds='',
-                               table_size=500, country_table_size=200, text_size=100,
-                               long_report=True).items():
+                               table_size=500, country_table_size=200, text_size=100).items():
             self.assertEqual(payload[key], value)
+        self.assertNotIn('long_report', payload)
+        self.assertNotIn('old_report', payload)
         self.message.answer_document.assert_awaited_once()
         self.history.assert_awaited_once()
 
@@ -145,7 +145,7 @@ class HandlerRegressionTests(unittest.IsolatedAsyncioTestCase):
         payload = await self.confirm()
         self.assertEqual(payload['report_kind'], 'product')
         self.assertEqual(payload['tn_ved'], '0101')
-        self.assertTrue(payload['long_report'])
+        self.assertNotIn('long_report', payload)
 
     async def test_plane(self):
         await self.begin('plane_cb')
@@ -182,11 +182,11 @@ class HandlerRegressionTests(unittest.IsolatedAsyncioTestCase):
         for handler in (handlers.digit_settings_handler, handlers.start_year_settings_handler,
                         handlers.months_settings_handler, handlers.exclude_tnved_settings_handler,
                         handlers.table_size_settings_handler, handlers.country_table_size_settings_handler,
-                        handlers.text_size_settings_handler, handlers.long_report_settings_handler):
+                        handlers.text_size_settings_handler):
             await self.enter(handler, 'ПРОПУСТИТЬ')
         payload = self.request.call_args.args[1]
         for key, value in dict(digit=4, text_size=7, table_size=25, country_table_size=15,
-                               long_report=False, exclude_tn_veds='8411,8517,8802').items():
+                               exclude_tn_veds='8411,8517,8802').items():
             self.assertEqual(payload[key], value)
         self.assertNotIn('start_year', payload)
         self.assertNotIn('month_from', payload)

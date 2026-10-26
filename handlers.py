@@ -562,7 +562,7 @@ async def table_size_settings_handler(message: types.Message, state: FSMContext)
         return
     
     if message.text.strip().lower() == "пропустить":
-        text = '25'
+        text = '20'
     else:
         if not text.isdigit():
             await message.answer("Пожалуйста, введите число от 1 до 500 или пропустите данный шаг.")
@@ -619,7 +619,7 @@ async def text_size_settings_handler(message: types.Message, state: FSMContext):
         return
     
     if message.text.strip().lower() == "пропустить":
-        text = '7'
+        text = '5'
     else:
         if not text.isdigit():
             await message.answer("Пожалуйста, введите число от 1 до 100 или пропустите данный шаг.")
@@ -631,29 +631,6 @@ async def text_size_settings_handler(message: types.Message, state: FSMContext):
             return
 
     await state.update_data(text_size=text)
-    keyboard = ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
-    keyboard.add(KeyboardButton("Начать заново"))
-    keyboard.add(KeyboardButton("Пропустить"))
-    keyboard.add(KeyboardButton("Включить"))
-    await message.answer('Включить в статистику таблицы по странам, по годам и по месяцам или пропустить данный шаг?', reply_markup=keyboard)
-    await StartNewStates.choosing_long_report_settings.set()
-
-async def long_report_settings_handler(message: types.Message, state: FSMContext):
-    text = message.text.strip()
-    if message.text.lower().strip() == "начать заново":
-        await start_new_handler(message, state)
-        return
-    
-    if message.text.strip().lower() == "пропустить":
-        text = '0'
-    else:
-        if text.lower().strip() != "включить":
-            await message.answer('Пожалуйста, выберите "Включить" для добавления в статистику таблиц по странам, года и мясяцам или пропустите данный шаг.')
-            return
-        else:
-            text = '1'
-
-    await state.update_data(long_report=text)    
     await finalize_report_start_new(message, state, message.from_user)
 
 
@@ -667,22 +644,20 @@ async def finalize_report_start_new(msg_or_cbq, state, tg_user):
     month_range = str(d.get('months')) if d.get('months') else ''
     tn_ved = ((d.get("tn_ved")).strip() or None)
     subcategory = (d.get("subcategory") or None)
-    long_report = int(d.get('long_report')) if d.get('long_report') else 0
     exclude_raw = d.get('exclude_tnved') if d.get('exclude_tnved') is not None else excluded_tnveds_string
     digit = int(d.get('digit')) if d.get('digit') else 4
-    text_size = int(d.get('text_size')) if d.get('text_size') else 7
-    table_size = int(d.get('table_size')) if d.get('table_size') else 25
+    text_size = int(d.get('text_size')) if d.get('text_size') else 5
+    table_size = int(d.get('table_size')) if d.get('table_size') else 20
     country_table_size = int(d.get('country_table_size')) if d.get('country_table_size') else 15
     if tn_ved:
         subcategory = None
-        long_report= 1
     plain=int(d.get("plain") or 0)
 
     if isinstance(msg_or_cbq, types.CallbackQuery):
         await msg_or_cbq.message.answer("❗Идет генерация справки. Пожалуйста, подождите.❗", reply_markup=ReplyKeyboardRemove())
     else:
         await msg_or_cbq.answer("❗Идет генерация справки. Пожалуйста, подождите.❗", reply_markup=ReplyKeyboardRemove())
-    print(f'\nChosen data: partner={partner}, start_year={start_year},end_year={year}, digit={digit},sub={subcategory}, text_size={text_size},table_size={table_size},country_table_size={country_table_size},tn_ved={tn_ved}, month_range_raw={month_range},long={long_report}, plain={plain}\n')
+    print(f'\nChosen data: partner={partner}, start_year={start_year},end_year={year}, digit={digit},sub={subcategory}, text_size={text_size},table_size={table_size},country_table_size={country_table_size},tn_ved={tn_ved}, month_range_raw={month_range}, plain={plain}\n')
     try:
         res = await asyncio.to_thread(
             generate_report,
@@ -699,7 +674,6 @@ async def finalize_report_start_new(msg_or_cbq, state, tg_user):
             tn_ved=tn_ved,
             month_range_raw=month_range,
             exclude_raw=exclude_raw,
-            long_report=long_report,
             plain=plain,
             include_regions=0,
             change_color=1,

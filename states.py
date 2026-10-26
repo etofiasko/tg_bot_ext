@@ -17,4 +17,3 @@ class StartNewStates(StatesGroup):
     choosing_table_size_settings = State()
     choosing_country_table_size_settings = State()
     choosing_text_size_settings = State()
-    choosing_long_report_settings = State()

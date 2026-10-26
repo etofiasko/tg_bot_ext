@@ -19,8 +19,7 @@ from handlers import (
     exclude_tnved_settings_handler,
     table_size_settings_handler,
     country_table_size_settings_handler,
-    text_size_settings_handler,
-    long_report_settings_handler)
+    text_size_settings_handler)
 from aiogram.types import Message
 from states import StartNewStates
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
@@ -163,10 +162,6 @@ async def msg_country_table_size_settings_handler(message: Message, state: FSMCo
 @dp.message_handler(state=StartNewStates.choosing_text_size_settings)
 async def msg_text_size_settings_handler(message: Message, state: FSMContext):
     await text_size_settings_handler(message, state)
-    
-@dp.message_handler(state=StartNewStates.choosing_long_report_settings)
-async def msg_long_report_settings_handler(message: Message, state: FSMContext):
-    await long_report_settings_handler(message, state)
 
 
 if __name__ == '__main__':

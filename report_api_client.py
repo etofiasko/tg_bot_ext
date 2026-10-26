@@ -62,7 +62,7 @@ def get_report_options():
 def generate_report(*, region, country_or_group, start_year, end_year, digit,
                     category, category_parent, text_size, table_size,
                     country_table_size, tn_ved, month_range_raw, exclude_raw,
-                    long_report, plain, include_regions, change_color):
+                    plain, include_regions, change_color):
     options = get_report_options()
     groups = {item["name"] for item in options["groups"]}
     countries = {item["name_ru"] for item in options["countries"]}
@@ -84,7 +84,6 @@ def generate_report(*, region, country_or_group, start_year, end_year, digit,
         payload.update(
             report_kind="product" if tn_ved else partner_kind,
             digit=digit,
-            long_report=bool(long_report),
             include_regions=bool(include_regions),
             report_style="blue" if change_color else "basic",
             text_size=text_size,

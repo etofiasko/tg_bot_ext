@@ -21,7 +21,7 @@ class ReportAPIClientTests(unittest.TestCase):
             start_year=None, end_year=2025, digit=4, category=None,
             category_parent=None, text_size=7, table_size=25,
             country_table_size=15, tn_ved=None, month_range_raw="",
-            exclude_raw="", long_report=0, plain=0, include_regions=0,
+            exclude_raw="", plain=0, include_regions=0,
             change_color=1,
         )
         self.headers = Message()
@@ -38,14 +38,15 @@ class ReportAPIClientTests(unittest.TestCase):
 
     def test_country_filters_and_filename(self):
         payload, result = self.generate(start_year=2023, month_range_raw="2,6",
-                                        category="Зерно", category_parent="СХ", long_report=1)
+                                        category="Зерно", category_parent="СХ")
         self.assertEqual(payload["report_kind"], "country")
         self.assertEqual(payload["country"], "Китай")
         self.assertEqual(payload["start_year"], 2023)
         self.assertEqual((payload["month_from"], payload["month_to"]), (2, 6))
         self.assertEqual(payload["category_root"], [3])
         self.assertEqual(payload["category"], ["Зерно"])
-        self.assertIs(payload["long_report"], True)
+        self.assertNotIn("long_report", payload)
+        self.assertNotIn("old_report", payload)
         self.assertIs(payload["include_regions"], False)
         self.assertEqual(payload["exclude_tn_veds"], "")
         self.assertEqual(result["filename"], self.filename)
@@ -60,7 +61,7 @@ class ReportAPIClientTests(unittest.TestCase):
         self.assertNotIn("start_year", payload)
 
     def test_product_preserves_leading_zero(self):
-        payload, _ = self.generate(country_or_group="весь мир", tn_ved="0101", long_report=1)
+        payload, _ = self.generate(country_or_group="весь мир", tn_ved="0101")
         self.assertEqual(payload["report_kind"], "product")
         self.assertEqual(payload["tn_ved"], "0101")
         self.assertEqual(payload["group"], "весь мир")
